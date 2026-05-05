@@ -254,31 +254,38 @@ export function useMapGrid(containerRef) {
 
     let lastHoveredId = null;
     mapObj.on("mousemove", "grid-fill", (e) => {
-      if (!e.features || e.features.length === 0) {
-        if (lastHoveredId) {
-          mapObj.setFeatureState(
-            { source: "grid-source", id: lastHoveredId },
-            { hover: false }
-          );
-          lastHoveredId = null;
-        }
-        return;
-      }
-      const feature = e.features[0];
-      const featureId = feature.id;
-      if (!featureId) return;
-      if (lastHoveredId === featureId) return;
+      // Reset hover state for previous tile
       if (lastHoveredId) {
         mapObj.setFeatureState(
           { source: "grid-source", id: lastHoveredId },
           { hover: false }
         );
+        lastHoveredId = null;
       }
+
+      if (!e.features || e.features.length === 0) {
+        // No tile under cursor: reset cursor to default
+        mapObj.getCanvas().style.cursor = "";
+        return;
+      }
+
+      const feature = e.features[0];
+      const featureId = feature.id;
+      if (!featureId) return;
+
+      // Set hover state for the new tile
       mapObj.setFeatureState(
         { source: "grid-source", id: featureId },
         { hover: true }
       );
       lastHoveredId = featureId;
+
+      // Determine cursor style based on whether tile is selected
+      const { tileX, tileY, tileZ } = feature.properties;
+      const isSelected = selectedTilesRef.current.some(
+        (t) => t.x === tileX && t.y === tileY && t.z === tileZ
+      );
+      mapObj.getCanvas().style.cursor = isSelected ? "move" : "pointer";
     });
 
     mapObj.on("mouseleave", "grid-fill", () => {
@@ -289,12 +296,6 @@ export function useMapGrid(containerRef) {
         );
         lastHoveredId = null;
       }
-    });
-
-    mapObj.on("mouseenter", "grid-fill", () => {
-      mapObj.getCanvas().style.cursor = "pointer";
-    });
-    mapObj.on("mouseleave", "grid-fill", () => {
       mapObj.getCanvas().style.cursor = "";
     });
 
@@ -304,13 +305,12 @@ export function useMapGrid(containerRef) {
     updateGridData();
   }, [handleGridClick, startDrag, updateGridData]);
 
-  // 👇 NEW: Set default 5x5 selections for both zoom 17 and 18
+  // Set default 5x5 selections for both zoom 17 and 18
   const setDefaultSelections = useCallback(() => {
     if (!map.current || defaultSelectionSet.current) return;
 
     const center = map.current.getCenter();
 
-    // Helper to generate 5x5 block for a given zoom level
     const generateDefaultBlock = (zoom) => {
       const tileCoords = getFracTileCoords(center, zoom);
       const centerX = Math.floor(tileCoords.x);

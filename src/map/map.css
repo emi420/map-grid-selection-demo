@@ -31,6 +31,18 @@
 }
 
 .selection-counter {
-  font-weight: bold;
-  color: #d32f2f;
+
 }
+
+.predict-button {
+  background: #C53639;
+  padding: 5px 15px;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.zoom-level-selection {
+  font-weight: bold;
+}
+
