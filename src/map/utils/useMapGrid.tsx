@@ -14,10 +14,23 @@ export function useMapGrid(containerRef) {
   const map = useRef(null);
   const gridInitialized = useRef(false);
   const [gridZoom, setGridZoom] = useState(17);
-  const [selectedTiles, setSelectedTiles] = useState([]);
-  const selectedTilesRef = useRef(selectedTiles);
 
-  // 👇 NEW: keep gridZoom in a ref so event handlers always see the latest value
+  // Store selections per zoom level (17 and 18)
+  const [selectionsByZoom, setSelectionsByZoom] = useState({
+    17: [],
+    18: [],
+  });
+
+  // Derived current selection for the active zoom
+  const selectedTiles = selectionsByZoom[gridZoom] || [];
+
+  // Keep a ref for the current selection to use in callbacks without stale closures
+  const selectedTilesRef = useRef(selectedTiles);
+  useEffect(() => {
+    selectedTilesRef.current = selectedTiles;
+  }, [selectedTiles]);
+
+  // Keep gridZoom in a ref so event handlers always see the latest value
   const gridZoomRef = useRef(gridZoom);
   useEffect(() => {
     gridZoomRef.current = gridZoom;
@@ -33,10 +46,6 @@ export function useMapGrid(containerRef) {
     startTileFrac: null,
   });
 
-  useEffect(() => {
-    selectedTilesRef.current = selectedTiles;
-  }, [selectedTiles]);
-
   const getTileId = (z, x, y) => `${z}|${x}|${y}`;
 
   // Sync feature states (selected/hover) from React state to the map
@@ -47,7 +56,7 @@ export function useMapGrid(containerRef) {
 
     const currentSelected = selectedTilesRef.current;
 
-    // clear previous selection states (stored on the function)
+    // Clear previous selection states (stored on the function)
     if (syncFeatureStates.prevSelected) {
       syncFeatureStates.prevSelected.forEach((tile) => {
         const id = getTileId(tile.z, tile.x, tile.y);
@@ -58,7 +67,7 @@ export function useMapGrid(containerRef) {
       });
     }
 
-    // apply new selection
+    // Apply new selection
     currentSelected.forEach((tile) => {
       const id = getTileId(tile.z, tile.x, tile.y);
       map.current.setFeatureState(
@@ -75,7 +84,7 @@ export function useMapGrid(containerRef) {
     if (!map.current || !gridInitialized.current || map.current.getZoom() < 12)
       return;
     const bounds = map.current.getBounds();
-    const geoJson = generateGridGeoJSON(bounds, gridZoomRef.current); // use ref
+    const geoJson = generateGridGeoJSON(bounds, gridZoomRef.current);
     const source = map.current.getSource("grid-source");
     if (source) {
       source.setData(geoJson);
@@ -83,7 +92,7 @@ export function useMapGrid(containerRef) {
         syncFeatureStates();
       });
     }
-  }, [syncFeatureStates]); // gridZoomRef is stable, no need to re-run
+  }, [syncFeatureStates]);
 
   // Click handler (toggle selection) – only if drag did not occur
   const handleGridClick = useCallback(
@@ -105,12 +114,14 @@ export function useMapGrid(containerRef) {
       const currentMaxSelections = gridZoomRef.current === 18 ? 50 : 25;
 
       if (isSelected) {
-        setSelectedTiles((prev) =>
-          prev.filter(
+        // Remove tile from current zoom's selection
+        setSelectionsByZoom((prev) => ({
+          ...prev,
+          [gridZoomRef.current]: prev[gridZoomRef.current].filter(
             (t) =>
               !(t.x === clickedTile.x && t.y === clickedTile.y && t.z === clickedTile.z)
-          )
-        );
+          ),
+        }));
       } else {
         const adjacentOk =
           currentSelected.length === 0 ||
@@ -123,10 +134,14 @@ export function useMapGrid(containerRef) {
           alert(`Maximum selection for zoom ${gridZoomRef.current} is ${currentMaxSelections} tiles.`);
           return;
         }
-        setSelectedTiles((prev) => [...prev, clickedTile]);
+        // Add tile to current zoom's selection
+        setSelectionsByZoom((prev) => ({
+          ...prev,
+          [gridZoomRef.current]: [...prev[gridZoomRef.current], clickedTile],
+        }));
       }
     },
-    [] // no dependency on gridZoom anymore
+    [] // No dependencies – uses refs
   );
 
   // Drag start logic
@@ -172,13 +187,19 @@ export function useMapGrid(containerRef) {
           y: tile.y + deltaY,
         }));
 
-        // remove duplicates
+        // Remove duplicates
         const uniqueMap = new Map();
         movedSelection.forEach((tile) => {
           const key = `${tile.z}|${tile.x}|${tile.y}`;
           if (!uniqueMap.has(key)) uniqueMap.set(key, tile);
         });
-        setSelectedTiles(Array.from(uniqueMap.values()));
+        const newSelection = Array.from(uniqueMap.values());
+
+        // Update selection for current zoom
+        setSelectionsByZoom((prev) => ({
+          ...prev,
+          [gridZoomRef.current]: newSelection,
+        }));
       };
 
       const onMouseUp = () => {
@@ -193,7 +214,7 @@ export function useMapGrid(containerRef) {
       window.addEventListener("mousemove", onMouseMove);
       window.addEventListener("mouseup", onMouseUp);
     },
-    [] // no dependency on gridZoom – uses ref
+    [] // No dependencies – uses refs
   );
 
   // Setup map layers and events (called once after map loads)
@@ -344,14 +365,13 @@ export function useMapGrid(containerRef) {
     };
   }, [containerRef, setupGrid]);
 
-  // When gridZoom changes, reset selection and refresh grid
+  // When gridZoom changes, refresh grid data (no reset of selection)
   useEffect(() => {
     if (!gridInitialized.current) return;
-    setSelectedTiles([]);
     updateGridData();
   }, [gridZoom, updateGridData]);
 
-  // Keep feature states in sync with selectedTiles
+  // Keep feature states in sync with selectedTiles (derived)
   useEffect(() => {
     if (gridInitialized.current) {
       syncFeatureStates();
