@@ -17,7 +17,7 @@ export default function MapView() {
           onChange={(e) => setGridZoom(parseInt(e.target.value))}
         >
           <option value={17}>17 (max 25 tiles)</option>
-          <option value={18}>18 (max 50 tiles)</option>
+          <option value={18}>18 (max 25 tiles)</option>
         </select>
         <div className="selection-counter">
           Selected: {selectedTiles.length} / {maxSelections}
