@@ -1,10 +1,21 @@
-import { reactRouter } from "@react-router/dev/vite";
-import tailwindcss from "@tailwindcss/vite";
-import { defineConfig } from "vite";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  plugins: [tailwindcss(), reactRouter()],
-  resolve: {
-    tsconfigPaths: true,
-  },
+  plugins: [react(), tailwindcss()],
+    server: {
+    proxy: {
+      '/oam-tiles': {
+        target: 'https://tiles.openaerialmap.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/oam-tiles/, ''),
+        // Optional: add headers to avoid redirection issues
+        headers: {
+          'Origin': 'https://tiles.openaerialmap.org'
+        }
+      }
+    }
+  }
 });
+
