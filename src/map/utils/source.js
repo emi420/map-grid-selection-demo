@@ -20,8 +20,9 @@ export const osm = {
 
 
 export const oam = {
-    type: "raster",
-    tiles: ["/oam-tiles/690585b76415e43597ffd7ea/0/690585b76415e43597ffd7eb/{z}/{x}/{y}"],
-    tileSize: 256,
-    attribution: "&copy; OpenAerialMap contributors",
+      type: "raster",
+      tiles: ["/oam-tiles/690585b76415e43597ffd7ea/0/690585b76415e43597ffd7eb/{z}/{x}/{y}"],
+      tileSize: 256,
+      attribution: "&copy; OpenAerialMap contributors",
+
 };
